@@ -1,0 +1,17 @@
+version: "3.9"
+
+services:
+  kanx-api:
+    build: .
+    image: kanx_drift_watch:latest
+    container_name: kanx-api
+    ports:
+      - "8000:8000"
+    environment:
+      - KANX_DRIFT_WATCH_CONFIG=/app/configs/default.yaml
+      - KANX_DRIFT_WATCH_CHECKPOINT=/app/checkpoints/kanx_model.keras
+      - KANX_DRIFT_WATCH_MAX_BATCH=4096
+    volumes:
+      - ./checkpoints:/app/checkpoints
+    restart: unless-stopped
+
