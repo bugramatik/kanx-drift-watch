@@ -1,0 +1,21 @@
+# Raw manifests for `kubectl apply -f k8s/`. Parameterized chart: charts/kanx.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kanx-api
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "8m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: kanx_drift_watch.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: kanx-api
+                port:
+                  number: 80
