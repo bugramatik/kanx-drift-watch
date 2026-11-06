@@ -37,7 +37,7 @@ from prometheus_client import Counter, Histogram
 from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel, Field
 
-from kanx_drift_watch import KAN, __version__
+from kanx_drift_watch import KAN, DriftMonitor, __version__
 from kanx_drift_watch.config import load_config
 from kanx_drift_watch.inference import load_model, predict
 
@@ -68,11 +68,17 @@ class ModelRegistry:
         self._in_features: int | None = None
         self._out_features: int | None = None
         self._loaded_at: float = 0.0
+        self._drift: DriftMonitor | None = None
 
     def set(self, model: tf.keras.Model, source: str) -> None:
         with self._lock:
             self._model = model
             self._source = source
+            try:
+                self._drift = DriftMonitor(model, tolerance=DRIFT_TOLERANCE)
+            except (TypeError, ValueError) as exc:
+                print(f"[kanx-api] drift monitor disabled: {exc}", flush=True)
+                self._drift = None
             # Best-effort shape introspection: build with a dummy if needed.
             try:
                 cfg = model.get_config()
@@ -94,6 +100,11 @@ class ModelRegistry:
             if self._model is None:
                 raise HTTPException(status_code=503, detail="Model not initialised")
             return self._model
+
+    @property
+    def drift(self) -> DriftMonitor | None:
+        with self._lock:
+            return self._drift
 
     def status(self) -> dict:
         with self._lock:
@@ -171,6 +182,10 @@ class PredictResponse(BaseModel):
     output: list[list[float]]
     shape: list[int]
     inference_ms: float
+    drift: bool = False
+    drift_features: list[int] = Field(default_factory=list)
+    drift_excess: dict[int, float] = Field(default_factory=dict)
+    drift_samples: int = 0
 
 
 class LoadRequest(BaseModel):
